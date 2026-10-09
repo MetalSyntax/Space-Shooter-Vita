@@ -26,16 +26,24 @@ if(DEFINED VITA OR DEFINED ENV{VITASDK})
 
     add_executable(${PROJECT_NAME} ${SOURCES})
 
+    set(VITAGL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib/vitagl)
+    set(VITAGL_LIB ${VITAGL_DIR}/libvitaGL.a)
+
+    set(VITASHARK_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib/vitashark)
+    set(VITASHARK_LIB ${VITASHARK_DIR}/libvitashark.a)
+
     target_include_directories(${PROJECT_NAME} PRIVATE
+        ${VITAGL_DIR}/source
+        ${VITASHARK_DIR}/include
         ${VITASDK}/arm-vita-eabi/include/SDL2
     )
 
-    # Cadena completa de dependencias de enlace para VitaSDK
+    # Cadena completa de dependencias de enlace para VitaSDK con vitaGL vendorizado
     target_link_libraries(${PROJECT_NAME}
-        vita2d
         SDL2
-        vitaGL
-        vitashark
+        ${VITAGL_LIB}
+        ${VITASHARK_LIB}
+        ${VITAGL_LIB}
         SceShaccCgExt
         taihen_stub
         mathneon
@@ -59,6 +67,8 @@ if(DEFINED VITA OR DEFINED ENV{VITASDK})
         SceProcessmgr_stub
         m
     )
+
+    target_link_options(${PROJECT_NAME} PRIVATE -Wl,--allow-multiple-definition)
 
     vita_create_self(${PROJECT_NAME}.self ${PROJECT_NAME} UNSAFE)
     vita_create_vpk(${PROJECT_NAME}.vpk ${VITA_TITLEID} ${PROJECT_NAME}.self

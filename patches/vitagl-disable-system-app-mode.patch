@@ -1,0 +1,22 @@
+diff --git a/source/gxm.c b/source/gxm.c
+index 3894e19..d35b580 100644
+--- a/source/gxm.c
++++ b/source/gxm.c
+@@ -368,6 +368,9 @@ void init_gxm(void) {
+ #endif
+ 
+ 	// Checking if the running application is a system one
++	// NOTE: Disabled autodetection because LiveArea VPKs with UNSAFE self trigger this,
++	// diverting into system_app_mode (shared-framebuffer via sceSharedFbBegin) and causing a permanent black screen.
++#if 0
+ 	SceAppMgrBudgetInfo info;
+ 	info.size = sizeof(SceAppMgrBudgetInfo);
+ 	if (!sceAppMgrGetBudgetInfo(&info)) {
+@@ -376,6 +379,7 @@ void init_gxm(void) {
+ 		if (msaa_mode == SCE_GXM_MULTISAMPLE_NONE) // FIXME: For some reasons, disabling MSAA makes the shader patcher not able to compile fragment programs in sysapp mode...
+ 			msaa_mode = SCE_GXM_MULTISAMPLE_2X;
+ 	}
++#endif
+ 
+ 	// Initializing sceGxm init parameters
+ 	SceGxmInitializeParams gxm_init_params;

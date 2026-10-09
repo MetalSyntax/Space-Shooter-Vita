@@ -5,18 +5,23 @@
 #include "generators/PixelArtGenerator.hpp"
 
 #ifdef __vita__
-#include <vita2d.h>
+#include <vitaGL.h>
+namespace Graphics {
+struct Texture2D {
+    GLuint id = 0;
+    int width = 0;
+    int height = 0;
+};
+typedef Texture2D TextureType;
+}
 #else
 #include <SDL2/SDL.h>
+namespace Graphics {
+typedef SDL_Texture TextureType;
+}
 #endif
 
 namespace Graphics {
-
-#ifdef __vita__
-typedef vita2d_texture TextureType;
-#else
-typedef SDL_Texture TextureType;
-#endif
 
 constexpr int SCREEN_WIDTH  = 960;
 constexpr int SCREEN_HEIGHT = 544;

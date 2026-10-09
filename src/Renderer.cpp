@@ -21,10 +21,22 @@ bool Renderer::init(const std::string& title) {
     scePowerSetGpuClockFrequency(222);
     scePowerSetGpuXbarClockFrequency(166);
 
-    // Inicializar vita2d nativo con VBlank wait activado para 60 FPS
-    vita2d_init();
-    vita2d_set_vblank_wait(1);
-    vita2d_set_clear_color(RGBA8(15, 23, 42, 255));
+    // Inicializar vitaGL vendorizado con 8 MB de vram
+    vglInitExtended(0, SCREEN_WIDTH, SCREEN_HEIGHT, 8 * 1024 * 1024, SCE_GXM_MULTISAMPLE_NONE);
+
+    glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrthof(0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT, 0.0f, -1.0f, 1.0f);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    glClearColor(15.0f / 255.0f, 23.0f / 255.0f, 42.0f / 255.0f, 1.0f);
     return true;
 #else
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -47,7 +59,7 @@ bool Renderer::init(const std::string& title) {
 
 void Renderer::shutdown() {
 #ifdef __vita__
-    vita2d_fini();
+    // vitaGL se limpia al salir el proceso sceKernelExitProcess
 #else
     if (sdlRenderer) {
         SDL_DestroyRenderer(sdlRenderer);
@@ -63,8 +75,8 @@ void Renderer::shutdown() {
 
 void Renderer::clear(uint8_t r, uint8_t g, uint8_t b) {
 #ifdef __vita__
-    vita2d_start_drawing();
-    vita2d_clear_screen();
+    glClearColor((float)r / 255.0f, (float)g / 255.0f, (float)b / 255.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
 #else
     if (!sdlRenderer) return;
     SDL_SetRenderDrawColor(sdlRenderer, r, g, b, 255);
@@ -74,8 +86,7 @@ void Renderer::clear(uint8_t r, uint8_t g, uint8_t b) {
 
 void Renderer::present() {
 #ifdef __vita__
-    vita2d_end_drawing();
-    vita2d_swap_buffers();
+    vglSwapBuffers(GL_TRUE);
 #else
     if (!sdlRenderer) return;
     SDL_RenderPresent(sdlRenderer);
@@ -86,20 +97,21 @@ TextureType* Renderer::createTextureFromRaw(const PixelArt::RawTexture& raw) {
     if (raw.width <= 0 || raw.height <= 0) return nullptr;
 
 #ifdef __vita__
-    // Crear textura vacía en vita2d (formato nativo SCE_GXM_TEXTURE_FORMAT_A8B8G8R8)
-    vita2d_texture* tex = vita2d_create_empty_texture_format(raw.width, raw.height, SCE_GXM_TEXTURE_FORMAT_A8B8G8R8);
-    if (!tex) return nullptr;
+    TextureType* tex = new TextureType();
+    tex->width = raw.width;
+    tex->height = raw.height;
 
-    uint32_t* dst = reinterpret_cast<uint32_t*>(vita2d_texture_get_datap(tex));
-    unsigned int stride = vita2d_texture_get_stride(tex) / sizeof(uint32_t);
+    glGenTextures(1, &tex->id);
+    glBindTexture(GL_TEXTURE_2D, tex->id);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
-    for (int y = 0; y < raw.height; ++y) {
-        for (int x = 0; x < raw.width; ++x) {
-            dst[y * stride + x] = raw.pixels[y * raw.width + x];
-        }
-    }
-    // Filtrado por vecino más cercano para pixel art nítido
-    vita2d_texture_set_filters(tex, SCE_GXM_TEXTURE_FILTER_POINT, SCE_GXM_TEXTURE_FILTER_POINT);
+    // Los píxeles raw son uint32_t RGBA (o ABGR). Subir a OpenGL como GL_RGBA
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, raw.width, raw.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, raw.pixels.data());
+    glBindTexture(GL_TEXTURE_2D, 0);
+
     return tex;
 #else
     if (!sdlRenderer) return nullptr;
@@ -121,7 +133,10 @@ TextureType* Renderer::createTextureFromRaw(const PixelArt::RawTexture& raw) {
 void Renderer::freeTexture(TextureType* tex) {
     if (!tex) return;
 #ifdef __vita__
-    vita2d_free_texture(tex);
+    if (tex->id != 0) {
+        glDeleteTextures(1, &tex->id);
+    }
+    delete tex;
 #else
     SDL_DestroyTexture(tex);
 #endif
@@ -131,15 +146,51 @@ void Renderer::drawTexture(TextureType* tex, int x, int y, double angleDeg, floa
     if (!tex) return;
 
 #ifdef __vita__
-    float rad = static_cast<float>(angleDeg * (3.1415926535 / 180.0));
-    float tw = static_cast<float>(vita2d_texture_get_width(tex));
-    float th = static_cast<float>(vita2d_texture_get_height(tex));
+    float w = (float)tex->width * scale;
+    float h = (float)tex->height * scale;
+    float x0 = centered ? -w * 0.5f : 0.0f;
+    float y0 = centered ? -h * 0.5f : 0.0f;
+    float x1 = x0 + w;
+    float y1 = y0 + h;
 
-    if (centered) {
-        vita2d_draw_texture_scale_rotate_hotspot(tex, x, y, scale, scale, rad, tw / 2.0f, th / 2.0f);
-    } else {
-        vita2d_draw_texture_scale_rotate(tex, x, y, scale, scale, rad);
+    float vertices[8] = {
+        x0, y0,
+        x1, y0,
+        x0, y1,
+        x1, y1
+    };
+
+    float texCoords[8] = {
+        0.0f, 0.0f,
+        1.0f, 0.0f,
+        0.0f, 1.0f,
+        1.0f, 1.0f
+    };
+
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, tex->id);
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glTranslatef((float)x, (float)y, 0.0f);
+    if (angleDeg != 0.0) {
+        glRotatef((float)angleDeg, 0.0f, 0.0f, 1.0f);
     }
+
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+
+    glVertexPointer(2, GL_FLOAT, 0, vertices);
+    glTexCoordPointer(2, GL_FLOAT, 0, texCoords);
+
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+    glDisableClientState(GL_VERTEX_ARRAY);
+
+    glPopMatrix();
+    glDisable(GL_TEXTURE_2D);
 #else
     if (!sdlRenderer) return;
     int w = 0, h = 0;
@@ -160,18 +211,50 @@ void Renderer::drawBackgroundTiled(TextureType* tex, int scrollX, int scrollY) {
     if (!tex) return;
 
 #ifdef __vita__
-    int tw = static_cast<int>(vita2d_texture_get_width(tex));
-    int th = static_cast<int>(vita2d_texture_get_height(tex));
+    int tw = tex->width;
+    int th = tex->height;
     if (tw <= 0 || th <= 0) return;
 
     int startX = (scrollX % tw) - tw;
     int startY = (scrollY % th) - th;
 
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, tex->id);
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+
+    float texCoords[8] = {
+        0.0f, 0.0f,
+        1.0f, 0.0f,
+        0.0f, 1.0f,
+        1.0f, 1.0f
+    };
+    glTexCoordPointer(2, GL_FLOAT, 0, texCoords);
+
     for (int y = startY; y < SCREEN_HEIGHT + th; y += th) {
         for (int x = startX; x < SCREEN_WIDTH + tw; x += tw) {
-            vita2d_draw_texture(tex, x, y);
+            float vertices[8] = {
+                (float)x, (float)y,
+                (float)(x + tw), (float)y,
+                (float)x, (float)(y + th),
+                (float)(x + tw), (float)(y + th)
+            };
+            glVertexPointer(2, GL_FLOAT, 0, vertices);
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         }
     }
+
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+    glDisableClientState(GL_VERTEX_ARRAY);
+
+    glPopMatrix();
+    glDisable(GL_TEXTURE_2D);
 #else
     if (!sdlRenderer) return;
     int tw = 0, th = 0;
@@ -192,7 +275,20 @@ void Renderer::drawBackgroundTiled(TextureType* tex, int scrollX, int scrollY) {
 
 void Renderer::drawRect(int x, int y, int w, int h, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
 #ifdef __vita__
-    vita2d_draw_rectangle(x, y, w, h, RGBA8(r, g, b, a));
+    glDisable(GL_TEXTURE_2D);
+    glColor4f((float)r / 255.0f, (float)g / 255.0f, (float)b / 255.0f, (float)a / 255.0f);
+
+    float vertices[8] = {
+        (float)x, (float)y,
+        (float)(x + w), (float)y,
+        (float)x, (float)(y + h),
+        (float)(x + w), (float)(y + h)
+    };
+
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glVertexPointer(2, GL_FLOAT, 0, vertices);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glDisableClientState(GL_VERTEX_ARRAY);
 #else
     if (!sdlRenderer) return;
     SDL_SetRenderDrawBlendMode(sdlRenderer, SDL_BLENDMODE_BLEND);
@@ -204,7 +300,7 @@ void Renderer::drawRect(int x, int y, int w, int h, uint8_t r, uint8_t g, uint8_
 
 void Renderer::drawPixel(int x, int y, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
 #ifdef __vita__
-    vita2d_draw_pixel(x, y, RGBA8(r, g, b, a));
+    drawRect(x, y, 1, 1, r, g, b, a);
 #else
     if (!sdlRenderer) return;
     SDL_SetRenderDrawColor(sdlRenderer, r, g, b, a);
