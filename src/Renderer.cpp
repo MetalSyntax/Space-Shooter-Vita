@@ -1,6 +1,10 @@
 #include "Renderer.hpp"
 #include <iostream>
 
+#ifdef __vita__
+#include <psp2/power.h>
+#endif
+
 namespace Graphics {
 
 Renderer& Renderer::instance() {
@@ -9,18 +13,27 @@ Renderer& Renderer::instance() {
 }
 
 bool Renderer::init(const std::string& title) {
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_AUDIO) < 0) {
-        std::cerr << "Error al inicializar SDL: " << SDL_GetError() << std::endl;
+#ifdef __vita__
+    // Configurar reloj máximo en PS Vita (444 MHz CPU, 222 MHz GPU) para fluidez absoluta
+    scePowerSetArmClockFrequency(444);
+    scePowerSetBusClockFrequency(222);
+    scePowerSetGpuClockFrequency(222);
+    scePowerSetGpuXbarClockFrequency(166);
+
+    // En PS Vita inicializar solo Video primero para garantizar contexto GXM/EGL
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         return false;
     }
 
-#ifdef __vita__
-    // En PS Vita la pantalla es fija a 960x544
     sdlWindow = SDL_CreateWindow(title.c_str(), 
                                  SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 
                                  SCREEN_WIDTH, SCREEN_HEIGHT, 
-                                 SDL_WINDOW_SHOWN);
+                                 0);
 #else
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+        return false;
+    }
+
     sdlWindow = SDL_CreateWindow(title.c_str(), 
                                  SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
                                  SCREEN_WIDTH, SCREEN_HEIGHT, 
@@ -28,24 +41,21 @@ bool Renderer::init(const std::string& title) {
 #endif
 
     if (!sdlWindow) {
-        std::cerr << "Error al crear ventana: " << SDL_GetError() << std::endl;
         return false;
     }
 
-    // Renderizador acelerado por hardware con VSync a 60 FPS
+    // En PS Vita SDL2 usa el driver GXM/vitaGL acelerado directamente con flag 0 o ACCELERATED
     sdlRenderer = SDL_CreateRenderer(sdlWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!sdlRenderer) {
-        sdlRenderer = SDL_CreateRenderer(sdlWindow, -1, SDL_RENDERER_SOFTWARE);
+        sdlRenderer = SDL_CreateRenderer(sdlWindow, -1, 0);
     }
 
     if (!sdlRenderer) {
-        std::cerr << "Error al crear renderer: " << SDL_GetError() << std::endl;
         return false;
     }
 
-    // Garantizar que la escala lógica interna sea exactamente 960x544
     SDL_RenderSetLogicalSize(sdlRenderer, SCREEN_WIDTH, SCREEN_HEIGHT);
-    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0"); // nearest-neighbor para pixel art
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
 
     return true;
 }
@@ -78,14 +88,13 @@ SDL_Texture* Renderer::createTextureFromRaw(const PixelArt::RawTexture& raw) {
 
     SDL_Texture* tex = SDL_CreateTexture(
         sdlRenderer,
-        SDL_PIXELFORMAT_ABGR8888, // Formato correspondiente a los píxeles generados
+        SDL_PIXELFORMAT_ABGR8888,
         SDL_TEXTUREACCESS_STATIC,
         raw.width,
         raw.height
     );
 
     if (!tex) {
-        std::cerr << "Error al crear textura: " << SDL_GetError() << std::endl;
         return nullptr;
     }
 

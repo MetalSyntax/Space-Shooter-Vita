@@ -14,6 +14,10 @@ Synth& Synth::instance() {
 }
 
 bool Synth::init() {
+    if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0) {
+        return false;
+    }
+
     SDL_AudioSpec wanted, obtained;
     SDL_zero(wanted);
     wanted.freq = 44100;
@@ -25,10 +29,11 @@ bool Synth::init() {
 
     deviceId = SDL_OpenAudioDevice(nullptr, 0, &wanted, &obtained, 0);
     if (deviceId == 0) {
+        // En Vita si el dispositivo de audio falla no debe colgar el hilo gráfico
         return false;
     }
 
-    SDL_PauseAudioDevice(deviceId, 0); // Comenzar reproducción
+    SDL_PauseAudioDevice(deviceId, 0);
     return true;
 }
 
@@ -40,31 +45,37 @@ void Synth::shutdown() {
 }
 
 void Synth::playLaser() {
+    if (deviceId == 0) return;
     std::lock_guard<std::mutex> lock(audioMutex);
     activeTones.push_back({WaveType::SAWTOOTH, 880.0f, 110.0f, 0.18f, 0.12f, 0.0f, 0.0f});
 }
 
 void Synth::playMissile() {
+    if (deviceId == 0) return;
     std::lock_guard<std::mutex> lock(audioMutex);
     activeTones.push_back({WaveType::TRIANGLE, 300.0f, 900.0f, 0.20f, 0.10f, 0.0f, 0.0f});
 }
 
 void Synth::playEnemyShoot() {
+    if (deviceId == 0) return;
     std::lock_guard<std::mutex> lock(audioMutex);
     activeTones.push_back({WaveType::SQUARE, 200.0f, 100.0f, 0.12f, 0.08f, 0.0f, 0.0f});
 }
 
 void Synth::playExplosion(bool big) {
+    if (deviceId == 0) return;
     std::lock_guard<std::mutex> lock(audioMutex);
     activeTones.push_back({WaveType::NOISE, 150.0f, 40.0f, big ? 0.60f : 0.35f, big ? 0.28f : 0.18f, 0.0f, 0.0f});
 }
 
 void Synth::playShieldHit() {
+    if (deviceId == 0) return;
     std::lock_guard<std::mutex> lock(audioMutex);
     activeTones.push_back({WaveType::SINE, 1200.0f, 400.0f, 0.15f, 0.12f, 0.0f, 0.0f});
 }
 
 void Synth::playBomb() {
+    if (deviceId == 0) return;
     std::lock_guard<std::mutex> lock(audioMutex);
     activeTones.push_back({WaveType::SAWTOOTH, 120.0f, 20.0f, 0.70f, 0.35f, 0.0f, 0.0f});
 }
@@ -111,12 +122,10 @@ void Synth::audioCallback(Uint8* stream, int len) {
             tone.elapsed += dt;
         }
 
-        // Limitador suave para evitar clipping de audio
         mix = std::clamp(mix, -1.0f, 1.0f);
         buffer[i] = static_cast<int16_t>(mix * 32767.0f);
     }
 
-    // Eliminar tonos finalizados
     activeTones.erase(
         std::remove_if(activeTones.begin(), activeTones.end(), [](const ActiveTone& t) {
             return t.elapsed >= t.duration;
