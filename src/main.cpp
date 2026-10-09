@@ -16,6 +16,7 @@
 #include "audio/Synth.hpp"
 #include "HUD.hpp"
 #include "SaveSystem.hpp"
+#include "TrophyManager.hpp"
 
 #ifdef __vita__
 #include <psp2/kernel/processmgr.h>
@@ -34,6 +35,10 @@ int main(int argc, char* argv[]) {
     // Inicializar sintetizador de audio
     auto& synth = Audio::Synth::instance();
     synth.init();
+
+    // Inicializar sistema de trofeos
+    auto& trophyMgr = Game::TrophyManager::instance();
+    trophyMgr.init();
 
     // Cargar datos persistentes
     auto saveData = Storage::SaveSystem::load();
@@ -127,6 +132,7 @@ int main(int argc, char* argv[]) {
             player.useBomb();
             synth.playBomb();
             particlePool.explode(Graphics::SCREEN_WIDTH / 2.0f, Graphics::SCREEN_HEIGHT / 2.0f, 4.0f);
+            trophyMgr.unlock(Game::TrophyId::HYPER_BOMB);
         }
 
         // 1. Gestor de Oleadas y Boss
@@ -135,17 +141,26 @@ int main(int argc, char* argv[]) {
         // 2. Estela de propulsor del jugador
         particlePool.spawnThruster(player.getX(), player.getY() + 18.0f, player.getAimAngle(), 250.0f);
 
-        // 3. Actualizar Jugador, Balas, Enemigos y Partículas
+        // 3. Actualizar Jugador, Balas, Enemigos, Partículas y Trofeos
         player.update(dt, input, bulletPool);
         bulletPool.update(dt);
         enemyPool.update(dt, player.getX(), player.getY(), bulletPool);
         particlePool.update(dt);
+        trophyMgr.update(dt);
 
         // 4. Detección de colisiones
         int prevScore = campaign.score;
         campaign.score += Game::CollisionSystem::checkBulletVsEnemies(bulletPool, enemyPool, waveManager, particlePool);
         if (campaign.score > prevScore) {
             synth.playExplosion(false);
+            trophyMgr.unlock(Game::TrophyId::FIRST_BLOOD);
+            if (campaign.score >= 10000) {
+                trophyMgr.unlock(Game::TrophyId::SCORE_10K);
+            }
+        }
+
+        if (waveManager.isLevelClear()) {
+            trophyMgr.unlock(Game::TrophyId::BOSS_SLAYER);
         }
 
         Game::CollisionSystem::checkEnemiesVsPlayer(bulletPool, enemyPool, player, particlePool);
@@ -196,6 +211,9 @@ int main(int argc, char* argv[]) {
 
         // HUD e interfaz pixel-art
         UI::HUD::render(renderer, campaign.score, player.getLives(), player.getBombs(), campaign.level, bossHpPct);
+
+        // Notificación de Trofeo emergente estilo PS Vita
+        trophyMgr.renderNotification(renderer);
 
         renderer.present();
     }
