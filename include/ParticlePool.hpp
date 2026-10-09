@@ -3,7 +3,6 @@
 #include <vector>
 #include <cmath>
 #include <cstdint>
-#include <SDL2/SDL.h>
 #include "Renderer.hpp"
 
 namespace Graphics {
@@ -57,7 +56,6 @@ public:
         }
     }
 
-    // Efecto de explosión estelar
     void explode(float x, float y, float scale = 1.0f) {
         int count = static_cast<int>(18 * scale);
         for (int i = 0; i < count; ++i) {
@@ -67,7 +65,6 @@ public:
             float vy = std::sin(angle) * speed;
             float life = 0.25f + ((std::rand() % 25) / 100.0f);
 
-            // Colores fuego y destellos
             if (i % 3 == 0) {
                 spawn(ParticleType::SPARK, x, y, vx, vy, life, 3.0f * scale, 255, 255, 200, 255);
             } else if (i % 2 == 0) {
@@ -76,11 +73,9 @@ public:
                 spawn(ParticleType::SMOKE, x, y, vx * 0.4f, vy * 0.4f, life * 2.0f, 6.0f * scale, 120, 120, 140, 200);
             }
         }
-        // Anillo de choque expansivo
         spawn(ParticleType::RING, x, y, 0.0f, 0.0f, 0.25f, 10.0f * scale, 255, 255, 255, 255);
     }
 
-    // Estela de propulsor de la nave
     void spawnThruster(float x, float y, float angleDeg, float shipSpeed) {
         float backRad = (angleDeg + 180.0f + (std::rand() % 24 - 12)) * (3.1415926535f / 180.0f);
         float speed = 70.0f + shipSpeed * 0.5f;
@@ -106,7 +101,7 @@ public:
             p.x += p.vx * dt;
             p.y += p.vy * dt;
 
-            float progress = 1.0f - (p.life / p.maxLife); // 0.0 al nacer, 1.0 al morir
+            float progress = 1.0f - (p.life / p.maxLife);
 
             if (p.type == ParticleType::RING) {
                 p.size = p.maxSize + progress * 60.0f;
@@ -122,40 +117,26 @@ public:
     }
 
     void render(Graphics::Renderer& renderer) {
-        SDL_Renderer* sdl = renderer.getSDLRenderer();
-        if (!sdl) return;
-
-        SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
-
         for (const auto& p : particles) {
             if (!p.active) continue;
 
-            SDL_SetRenderDrawColor(sdl, p.r, p.g, p.b, p.a);
-
             if (p.type == ParticleType::RING) {
-                // Dibujar círculo hueco
                 int radius = static_cast<int>(p.size);
                 int cx = static_cast<int>(p.x);
                 int cy = static_cast<int>(p.y);
-                for (int w = 0; w < radius * 2; w++) {
-                    for (int h = 0; h < radius * 2; h++) {
+                for (int w = 0; w < radius * 2; w += 2) {
+                    for (int h = 0; h < radius * 2; h += 2) {
                         int dx = radius - w;
                         int dy = radius - h;
                         int distSq = dx * dx + dy * dy;
-                        if (distSq >= (radius - 2) * (radius - 2) && distSq <= radius * radius) {
-                            SDL_RenderDrawPoint(sdl, cx + dx, cy + dy);
+                        if (distSq >= (radius - 3) * (radius - 3) && distSq <= radius * radius) {
+                            renderer.drawPixel(cx + dx, cy + dy, p.r, p.g, p.b, p.a);
                         }
                     }
                 }
             } else {
                 int sz = std::max(1, static_cast<int>(p.size));
-                SDL_Rect r = {
-                    static_cast<int>(p.x - sz / 2),
-                    static_cast<int>(p.y - sz / 2),
-                    sz,
-                    sz
-                };
-                SDL_RenderFillRect(sdl, &r);
+                renderer.drawRect(static_cast<int>(p.x - sz / 2), static_cast<int>(p.y - sz / 2), sz, sz, p.r, p.g, p.b, p.a);
             }
         }
     }

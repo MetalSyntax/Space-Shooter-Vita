@@ -25,7 +25,7 @@ public:
 
     void init(ShipId shipId);
     void update(float dt, const Input::InputState& input, BulletPool<512>& bulletPool);
-    void render(Graphics::Renderer& renderer, SDL_Texture* shipTex, SDL_Texture* shieldTex, SDL_Texture* droneTex);
+    void render(Graphics::Renderer& renderer, Graphics::TextureType* shipTex, Graphics::TextureType* shieldTex, Graphics::TextureType* droneTex);
 
     void takeHit();
     void useBomb();

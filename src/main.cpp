@@ -61,40 +61,40 @@ int main(int argc, char* argv[]) {
         currentLevelDef.nebula2,
         256
     );
-    SDL_Texture* texBg = renderer.createTextureFromRaw(rawBg);
+    Graphics::TextureType* texBg = renderer.createTextureFromRaw(rawBg);
 
     // 3. Hornear sprites de jugador
     PixelArt::Grid shipGrid = PixelArt::generateShip(1337, 12, 12);
-    SDL_Texture* texShip = renderer.createTextureFromRaw(PixelArt::bakeTexture(shipGrid, PixelArt::PALETTES.at("player"), 3));
+    Graphics::TextureType* texShip = renderer.createTextureFromRaw(PixelArt::bakeTexture(shipGrid, PixelArt::PALETTES.at("player"), 3));
 
     // 4. Proyectiles y Powerups
     PixelArt::Grid laserGrid = PixelArt::makeGrid(2, 6, PixelArt::CORE);
     laserGrid[0][0] = laserGrid[0][1] = PixelArt::LIGHT;
-    SDL_Texture* texLaser = renderer.createTextureFromRaw(PixelArt::bakeTexture(laserGrid, PixelArt::PALETTES.at("player"), 3));
+    Graphics::TextureType* texLaser = renderer.createTextureFromRaw(PixelArt::bakeTexture(laserGrid, PixelArt::PALETTES.at("player"), 3));
 
     PixelArt::Grid missileGrid = PixelArt::generateMissile();
-    SDL_Texture* texMissile = renderer.createTextureFromRaw(PixelArt::bakeTexture(missileGrid, PixelArt::PALETTES.at("player"), 3));
+    Graphics::TextureType* texMissile = renderer.createTextureFromRaw(PixelArt::bakeTexture(missileGrid, PixelArt::PALETTES.at("player"), 3));
 
     PixelArt::Grid orbGrid = PixelArt::generateOrb(8);
-    SDL_Texture* texEnemyOrb = renderer.createTextureFromRaw(PixelArt::bakeTexture(orbGrid, PixelArt::PALETTES.at("toxic"), 3));
+    Graphics::TextureType* texEnemyOrb = renderer.createTextureFromRaw(PixelArt::bakeTexture(orbGrid, PixelArt::PALETTES.at("toxic"), 3));
 
     PixelArt::Grid shieldGrid = PixelArt::generateOrb(16, true);
-    SDL_Texture* texShield = renderer.createTextureFromRaw(PixelArt::bakeTexture(shieldGrid, PixelArt::PALETTES.at("rift"), 2));
+    Graphics::TextureType* texShield = renderer.createTextureFromRaw(PixelArt::bakeTexture(shieldGrid, PixelArt::PALETTES.at("rift"), 2));
 
     PixelArt::Grid droneGrid = PixelArt::generateShip(99, 6, 6);
-    SDL_Texture* texDrone = renderer.createTextureFromRaw(PixelArt::bakeTexture(droneGrid, PixelArt::PALETTES.at("gold"), 2));
+    Graphics::TextureType* texDrone = renderer.createTextureFromRaw(PixelArt::bakeTexture(droneGrid, PixelArt::PALETTES.at("gold"), 2));
 
     // 5. Hornear Sprites de Enemigos
     PixelArt::Palette pWeaver, pGunship;
     PixelArt::Grid weaverGrid = OriginalSprites::decodeSprite(OriginalSprites::enemyWeaver, pWeaver);
-    SDL_Texture* texEnemyWeaver = renderer.createTextureFromRaw(PixelArt::bakeTexture(weaverGrid, pWeaver, 2));
+    Graphics::TextureType* texEnemyWeaver = renderer.createTextureFromRaw(PixelArt::bakeTexture(weaverGrid, pWeaver, 2));
 
     PixelArt::Grid enemyShipGrid = OriginalSprites::decodeSprite(OriginalSprites::enemyShip, pGunship);
-    SDL_Texture* texEnemyGunship = renderer.createTextureFromRaw(PixelArt::bakeTexture(enemyShipGrid, pGunship, 2));
+    Graphics::TextureType* texEnemyGunship = renderer.createTextureFromRaw(PixelArt::bakeTexture(enemyShipGrid, pGunship, 2));
 
     // 6. Hornear Boss del Sector
     PixelArt::Grid bossGrid = BossGenerator::generateBossHull(currentLevelDef.boss);
-    SDL_Texture* texBoss = renderer.createTextureFromRaw(PixelArt::bakeTexture(bossGrid, PixelArt::PALETTES.at("volcanic"), 2));
+    Graphics::TextureType* texBoss = renderer.createTextureFromRaw(PixelArt::bakeTexture(bossGrid, PixelArt::PALETTES.at("volcanic"), 2));
 
     // 7. Instanciar Jugador y Pools
     Game::Player player;
@@ -193,14 +193,8 @@ int main(int argc, char* argv[]) {
             bossHpPct = std::max(0.0f, static_cast<float>(waveManager.getBossHp()) / waveManager.getBossMaxHp());
 
             // Barra de vida del Boss
-            SDL_Renderer* sdl = renderer.getSDLRenderer();
-            SDL_Rect barBg = {Graphics::SCREEN_WIDTH / 2 - 150, 20, 300, 12};
-            SDL_SetRenderDrawColor(sdl, 50, 50, 60, 200);
-            SDL_RenderFillRect(sdl, &barBg);
-
-            SDL_Rect barFg = {Graphics::SCREEN_WIDTH / 2 - 148, 22, static_cast<int>(296 * bossHpPct), 8};
-            SDL_SetRenderDrawColor(sdl, 255, 60, 60, 255);
-            SDL_RenderFillRect(sdl, &barFg);
+            renderer.drawRect(Graphics::SCREEN_WIDTH / 2 - 150, 20, 300, 12, 50, 50, 60, 200);
+            renderer.drawRect(Graphics::SCREEN_WIDTH / 2 - 148, 22, static_cast<int>(296 * bossHpPct), 8, 255, 60, 60, 255);
         }
 
         // Balas
@@ -221,16 +215,16 @@ int main(int argc, char* argv[]) {
     // Limpieza
     synth.shutdown();
 
-    SDL_DestroyTexture(texBg);
-    SDL_DestroyTexture(texShip);
-    SDL_DestroyTexture(texLaser);
-    SDL_DestroyTexture(texMissile);
-    SDL_DestroyTexture(texEnemyOrb);
-    SDL_DestroyTexture(texShield);
-    SDL_DestroyTexture(texDrone);
-    SDL_DestroyTexture(texEnemyWeaver);
-    SDL_DestroyTexture(texEnemyGunship);
-    SDL_DestroyTexture(texBoss);
+    renderer.freeTexture(texBg);
+    renderer.freeTexture(texShip);
+    renderer.freeTexture(texLaser);
+    renderer.freeTexture(texMissile);
+    renderer.freeTexture(texEnemyOrb);
+    renderer.freeTexture(texShield);
+    renderer.freeTexture(texDrone);
+    renderer.freeTexture(texEnemyWeaver);
+    renderer.freeTexture(texEnemyGunship);
+    renderer.freeTexture(texBoss);
 
     renderer.shutdown();
 

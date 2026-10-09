@@ -1,10 +1,22 @@
 #pragma once
 
-#include <SDL2/SDL.h>
 #include <string>
+#include <cstdint>
 #include "generators/PixelArtGenerator.hpp"
 
+#ifdef __vita__
+#include <vita2d.h>
+#else
+#include <SDL2/SDL.h>
+#endif
+
 namespace Graphics {
+
+#ifdef __vita__
+typedef vita2d_texture TextureType;
+#else
+typedef SDL_Texture TextureType;
+#endif
 
 constexpr int SCREEN_WIDTH  = 960;
 constexpr int SCREEN_HEIGHT = 544;
@@ -19,23 +31,28 @@ public:
     void clear(uint8_t r = 15, uint8_t g = 23, uint8_t b = 42); // #0f172a
     void present();
 
-    SDL_Renderer* getSDLRenderer() const { return sdlRenderer; }
-
-    // Crea una textura SDL a partir de RawTexture (pixel-perfect RGBA)
-    SDL_Texture* createTextureFromRaw(const PixelArt::RawTexture& raw);
+    // Crea una textura nativa (vita2d_texture en PS Vita, SDL_Texture en PC)
+    TextureType* createTextureFromRaw(const PixelArt::RawTexture& raw);
+    void freeTexture(TextureType* tex);
 
     // Dibuja una textura centrada o en coordenadas (x, y) con rotación y escala
-    void drawTexture(SDL_Texture* tex, int x, int y, double angleDeg = 0.0, float scale = 1.0f, bool centered = true);
+    void drawTexture(TextureType* tex, int x, int y, double angleDeg = 0.0, float scale = 1.0f, bool centered = true);
 
     // Dibuja un fondo en mosaico (tiling)
-    void drawBackgroundTiled(SDL_Texture* tex, int scrollX = 0, int scrollY = 0);
+    void drawBackgroundTiled(TextureType* tex, int scrollX = 0, int scrollY = 0);
+
+    // Primitivas de renderizado directo
+    void drawRect(int x, int y, int w, int h, uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);
+    void drawPixel(int x, int y, uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);
 
 private:
     Renderer() = default;
     ~Renderer() = default;
 
+#ifndef __vita__
     SDL_Window* sdlWindow = nullptr;
     SDL_Renderer* sdlRenderer = nullptr;
+#endif
 };
 
 } // namespace Graphics

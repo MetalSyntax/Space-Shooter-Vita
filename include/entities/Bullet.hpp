@@ -67,11 +67,11 @@ public:
         }
     }
 
-    void render(Graphics::Renderer& renderer, SDL_Texture* texLaser, SDL_Texture* texMissile, SDL_Texture* texEnemyOrb) {
+    void render(Graphics::Renderer& renderer, Graphics::TextureType* texLaser, Graphics::TextureType* texMissile, Graphics::TextureType* texEnemyOrb) {
         for (const auto& b : bullets) {
             if (!b.active) continue;
 
-            SDL_Texture* tex = texLaser;
+            Graphics::TextureType* tex = texLaser;
             float scale = 1.0f;
             if (b.type == BulletType::PLAYER_MISSILE) {
                 tex = texMissile;

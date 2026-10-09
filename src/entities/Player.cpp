@@ -160,7 +160,7 @@ void Player::fire(BulletPool<512>& bulletPool) {
     }
 }
 
-void Player::render(Graphics::Renderer& renderer, SDL_Texture* shipTex, SDL_Texture* shieldTex, SDL_Texture* droneTex) {
+void Player::render(Graphics::Renderer& renderer, Graphics::TextureType* shipTex, Graphics::TextureType* shieldTex, Graphics::TextureType* droneTex) {
     if (invulnTimer > 0.0f) {
         int flash = static_cast<int>(invulnTimer * 15.0f) % 2;
         if (flash == 0) return;

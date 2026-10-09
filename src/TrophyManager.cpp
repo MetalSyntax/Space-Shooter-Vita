@@ -21,7 +21,6 @@ TrophyManager::TrophyManager() {
 
 void TrophyManager::init() {
     auto data = Storage::SaveSystem::load();
-    // Cargar trofeos desbloqueados si están marcados
     if (data.highScore >= 10000) trophies[2].unlocked = true;
     if (data.highestSector >= 5) trophies[5].unlocked = true;
 }
@@ -30,10 +29,9 @@ void TrophyManager::unlock(TrophyId id) {
     for (auto& t : trophies) {
         if (t.id == id && !t.unlocked) {
             t.unlocked = true;
-            popupText = "TROFEO DESBLOQUEADO: " + t.title;
-            popupTimer = 3.5f; // Mostrar notificación durante 3.5 segundos
+            popupText = "TROFEO: " + t.title;
+            popupTimer = 3.5f;
 
-            // Persistir
             auto data = Storage::SaveSystem::load();
             Storage::SaveSystem::save(data);
             break;
@@ -57,33 +55,19 @@ void TrophyManager::update(float dt) {
 void TrophyManager::renderNotification(Graphics::Renderer& renderer) {
     if (popupTimer <= 0.0f) return;
 
-    SDL_Renderer* sdl = renderer.getSDLRenderer();
-    if (!sdl) return;
-
-    // Caja de notificación en la esquina superior derecha al estilo PS Vita
-    int boxW = 340;
-    int boxH = 44;
+    int boxW = 320;
+    int boxH = 40;
     int boxX = Graphics::SCREEN_WIDTH - boxW - 20;
     int boxY = 60;
 
-    SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
-
-    // Fondo azul translúcido PlayStation
-    SDL_Rect bg = {boxX, boxY, boxW, boxH};
-    SDL_SetRenderDrawColor(sdl, 10, 40, 90, 230);
-    SDL_RenderFillRect(sdl, &bg);
-
-    // Borde brillante
-    SDL_SetRenderDrawColor(sdl, 0, 150, 255, 255);
-    SDL_RenderDrawRect(sdl, &bg);
+    // Fondo azul translúcido
+    renderer.drawRect(boxX, boxY, boxW, boxH, 10, 40, 90, 230);
 
     // Ícono de trofeo dorado
-    SDL_Rect trophyIcon = {boxX + 12, boxY + 12, 20, 20};
-    SDL_SetRenderDrawColor(sdl, 255, 215, 0, 255);
-    SDL_RenderFillRect(sdl, &trophyIcon);
+    renderer.drawRect(boxX + 10, boxY + 10, 20, 20, 255, 215, 0, 255);
 
     // Texto del trofeo
-    UI::BitmapFont::drawText(renderer, popupText, boxX + 42, boxY + 16, 2, 255, 255, 255);
+    UI::BitmapFont::drawText(renderer, popupText, boxX + 38, boxY + 14, 2, 255, 255, 255);
 }
 
 } // namespace Game

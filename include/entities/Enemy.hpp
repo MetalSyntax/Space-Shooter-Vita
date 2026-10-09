@@ -176,11 +176,11 @@ public:
         }
     }
 
-    void render(Graphics::Renderer& renderer, SDL_Texture* texDrone, SDL_Texture* texGunship) {
+    void render(Graphics::Renderer& renderer, Graphics::TextureType* texDrone, Graphics::TextureType* texGunship) {
         for (const auto& e : enemies) {
             if (!e.active) continue;
 
-            SDL_Texture* tex = texDrone;
+            Graphics::TextureType* tex = texDrone;
             if (e.type == EnemyType::GUNSHIP || e.type == EnemyType::SPREADER) {
                 tex = texGunship;
             }

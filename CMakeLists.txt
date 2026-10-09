@@ -32,6 +32,7 @@ if(DEFINED VITA OR DEFINED ENV{VITASDK})
 
     # Cadena completa de dependencias de enlace para VitaSDK
     target_link_libraries(${PROJECT_NAME}
+        vita2d
         SDL2
         vitaGL
         vitashark
