@@ -14,21 +14,20 @@ Renderer& Renderer::instance() {
 
 bool Renderer::init(const std::string& title) {
 #ifdef __vita__
-    // Configurar reloj máximo en PS Vita (444 MHz CPU, 222 MHz GPU) para fluidez absoluta
     scePowerSetArmClockFrequency(444);
     scePowerSetBusClockFrequency(222);
     scePowerSetGpuClockFrequency(222);
     scePowerSetGpuXbarClockFrequency(166);
 
-    // En PS Vita inicializar solo Video primero para garantizar contexto GXM/EGL
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         return false;
     }
 
+    // Ventana fija de 960x544 en PS Vita
     sdlWindow = SDL_CreateWindow(title.c_str(), 
                                  SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 
                                  SCREEN_WIDTH, SCREEN_HEIGHT, 
-                                 0);
+                                 SDL_WINDOW_SHOWN);
 #else
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         return false;
@@ -44,17 +43,17 @@ bool Renderer::init(const std::string& title) {
         return false;
     }
 
-    // En PS Vita SDL2 usa el driver GXM/vitaGL acelerado directamente con flag 0 o ACCELERATED
+#ifdef __vita__
+    // En PS Vita, SDL_CreateRenderer con flag 0 selecciona el backend oficial de GXM
+    sdlRenderer = SDL_CreateRenderer(sdlWindow, -1, 0);
+#else
     sdlRenderer = SDL_CreateRenderer(sdlWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    if (!sdlRenderer) {
-        sdlRenderer = SDL_CreateRenderer(sdlWindow, -1, 0);
-    }
+#endif
 
     if (!sdlRenderer) {
         return false;
     }
 
-    SDL_RenderSetLogicalSize(sdlRenderer, SCREEN_WIDTH, SCREEN_HEIGHT);
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
 
     return true;
@@ -86,20 +85,30 @@ void Renderer::present() {
 SDL_Texture* Renderer::createTextureFromRaw(const PixelArt::RawTexture& raw) {
     if (!sdlRenderer || raw.width <= 0 || raw.height <= 0) return nullptr;
 
-    SDL_Texture* tex = SDL_CreateTexture(
-        sdlRenderer,
-        SDL_PIXELFORMAT_ABGR8888,
-        SDL_TEXTUREACCESS_STATIC,
+    // Crear Surface intermedia con los píxeles RGBA en memoria RAM
+    SDL_Surface* surf = SDL_CreateRGBSurfaceWithFormatFrom(
+        const_cast<uint32_t*>(raw.pixels.data()),
         raw.width,
-        raw.height
+        raw.height,
+        32,
+        raw.width * sizeof(uint32_t),
+        SDL_PIXELFORMAT_ABGR8888
     );
+
+    if (!surf) {
+        return nullptr;
+    }
+
+    // En Vita GXM, SDL_CreateTextureFromSurface asigna la memoria VRAM de GXM y
+    // realiza la subida de datos y alineamiento de pitch de forma garantizada y nativa
+    SDL_Texture* tex = SDL_CreateTextureFromSurface(sdlRenderer, surf);
+    SDL_FreeSurface(surf);
 
     if (!tex) {
         return nullptr;
     }
 
     SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
-    SDL_UpdateTexture(tex, nullptr, raw.pixels.data(), raw.width * sizeof(uint32_t));
     return tex;
 }
 
