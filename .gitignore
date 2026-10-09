@@ -1,0 +1,8 @@
+build/
+build_vita/
+*.vpk
+*.self
+*.velf
+*.sfo
+.DS_Store
+save_data/
