@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 #include "SaveSystem.hpp"
-#include "HUD.hpp"
+#include "Renderer.hpp"
 
 namespace Game {
 

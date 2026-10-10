@@ -121,19 +121,7 @@ public:
             if (!p.active) continue;
 
             if (p.type == ParticleType::RING) {
-                int radius = static_cast<int>(p.size);
-                int cx = static_cast<int>(p.x);
-                int cy = static_cast<int>(p.y);
-                for (int w = 0; w < radius * 2; w += 2) {
-                    for (int h = 0; h < radius * 2; h += 2) {
-                        int dx = radius - w;
-                        int dy = radius - h;
-                        int distSq = dx * dx + dy * dy;
-                        if (distSq >= (radius - 3) * (radius - 3) && distSq <= radius * radius) {
-                            renderer.drawPixel(cx + dx, cy + dy, p.r, p.g, p.b, p.a);
-                        }
-                    }
-                }
+                renderer.drawCircle(p.x, p.y, p.size, 3.0f, Graphics::Color{p.r, p.g, p.b, p.a});
             } else {
                 int sz = std::max(1, static_cast<int>(p.size));
                 renderer.drawRect(static_cast<int>(p.x - sz / 2), static_cast<int>(p.y - sz / 2), sz, sz, p.r, p.g, p.b, p.a);

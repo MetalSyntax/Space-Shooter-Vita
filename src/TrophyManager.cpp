@@ -1,5 +1,6 @@
 #include "TrophyManager.hpp"
-#include <iostream>
+#include "Text.hpp"
+#include "I18n.hpp"
 
 namespace Game {
 
@@ -20,8 +21,9 @@ TrophyManager::TrophyManager() {
 }
 
 void TrophyManager::init() {
-    auto data = Storage::SaveSystem::load();
-    if (data.highScore >= 10000) trophies[2].unlocked = true;
+    const auto& data = Storage::SaveSystem::data();
+    for (auto& t : trophies) t.unlocked = data.trophies & (1u << static_cast<int>(t.id));
+    if (data.scoreCount > 0 && data.scores[0].score >= 10000) trophies[2].unlocked = true;
     if (data.highestSector >= 5) trophies[5].unlocked = true;
 }
 
@@ -29,11 +31,11 @@ void TrophyManager::unlock(TrophyId id) {
     for (auto& t : trophies) {
         if (t.id == id && !t.unlocked) {
             t.unlocked = true;
-            popupText = "TROFEO: " + t.title;
+            popupText = std::string(I18n::L("TROFEO: ", "TROPHY: ")) + t.title;
             popupTimer = 3.5f;
 
-            auto data = Storage::SaveSystem::load();
-            Storage::SaveSystem::save(data);
+            Storage::SaveSystem::data().trophies |= 1u << static_cast<int>(id);
+            Storage::SaveSystem::flush();
             break;
         }
     }
@@ -55,7 +57,7 @@ void TrophyManager::update(float dt) {
 void TrophyManager::renderNotification(Graphics::Renderer& renderer) {
     if (popupTimer <= 0.0f) return;
 
-    int boxW = 320;
+    int boxW = 360;
     int boxH = 40;
     int boxX = Graphics::SCREEN_WIDTH - boxW - 20;
     int boxY = 60;
@@ -67,7 +69,7 @@ void TrophyManager::renderNotification(Graphics::Renderer& renderer) {
     renderer.drawRect(boxX + 10, boxY + 10, 20, 20, 255, 215, 0, 255);
 
     // Texto del trofeo
-    UI::BitmapFont::drawText(renderer, popupText, boxX + 38, boxY + 14, 2, 255, 255, 255);
+    UI::drawText(renderer, popupText, boxX + 38, boxY + 12, 2);
 }
 
 } // namespace Game
