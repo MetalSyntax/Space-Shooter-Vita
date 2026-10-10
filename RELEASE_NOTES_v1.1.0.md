@@ -1,48 +1,48 @@
 # Shooter Space v1.1.0 — PS Vita
 
-Paridad completa con la versión web (Phaser): todas las pantallas, naves, enemigos y jefes del original, ahora nativos en PS Vita.
+Full parity with the web version (Phaser): every screen, ship, enemy and boss from the original, now running natively on PS Vita.
 
-**Instalación:** copia `ShooterSpace.vpk` a la consola e instálalo con VitaShell (Title ID `SHTR00001`, versión 01.10). Si tenías la v1.0, desinstálala antes. Tu récord anterior se conserva.
+**Install:** copy `ShooterSpace.vpk` to your console and install it with VitaShell (Title ID `SHTR00001`, version 01.10). If you have v1.0 installed, uninstall it first. Your previous high score is kept.
 
-## Novedades
+## What's new
 
-### Pantallas
-- **Menú principal:** dificultad (Fácil / Normal / Difícil), Continuar desde el sector guardado o Nueva partida, récord, y botones de música, SFX e idioma.
-- **Hangar:** 5 naves (Vanguard, Striker, Phantom, Bulwark, Nova) con su arte original, habilidad única y estadísticas.
-- **Guía:** poderes, enemigos y jefes.
-- **Pausa:** reanudar, reiniciar, música, SFX, guía y menú principal.
-- **Sector superado:** estadísticas (enemigos, precisión, bonus) y elección de 1 de 3 mejoras.
-- **Game Over y Victoria:** top 5 de puntuaciones locales.
+### Screens
+- **Main menu:** difficulty (Easy / Normal / Hard), Continue from the saved sector or New Game, high score, plus music, SFX and language toggles.
+- **Hangar:** 5 ships (Vanguard, Striker, Phantom, Bulwark, Nova) with their original art, unique ability and stats.
+- **Guide:** power-ups, enemies and bosses.
+- **Pause:** resume, restart, music, SFX, guide and main menu.
+- **Sector Cleared:** stats (kills, accuracy, bonus) and a choice of 1 out of 3 upgrades.
+- **Game Over and Victory:** local top 5 high scores.
 
-### Juego
-- Campaña de 10 sectores con guardado automático al empezar cada uno.
-- Combos (x1.5 / x2 / x3), golpes críticos y 7 power-ups: escudo, disparo rápido, abanico, misiles, dron, imán y Hyper Bomb.
-- Roster completo de enemigos, cada color con su habilidad: drones, gunships, lancers, pods con escudo, spreaders, arañas que se dividen, blinkers, kamikazes, naves láser, asteroides y minas.
-- Los 10 jefes con sus ataques propios: rayos anunciados, torretas, orbes escudo, señuelos, enjambres, vórtice gravitatorio y 3 fases en el jefe final.
-- Decorado y efectos por sector (asteroides, plasma, anillos, estructuras, relámpagos, pulso).
-- HUD completo: puntuación, combo, vidas, bombas, temporizadores de poderes, progreso del sector y barra del jefe.
+### Gameplay
+- 10-sector campaign that autosaves at the start of each sector.
+- Combos (x1.5 / x2 / x3), critical hits and 7 power-ups: shield, rapid fire, spread shot, missiles, drone, magnet and Hyper Bomb.
+- Full enemy roster, where each color means an ability: drones, gunships, lancers, shielded pods, spreaders, splitting spiders, blinkers, kamikazes, laser ships, asteroids and mines.
+- All 10 bosses with their own attacks: telegraphed beams, turrets, shield orbs, decoys, swarms, a gravity vortex and a 3-phase final boss.
+- Per-sector scenery and effects (asteroids, plasma, rings, structures, lightning, pulse).
+- Full HUD: score, combo, lives, bombs, power-up timers, sector progress and boss health bar.
 
-### Presentación
-- Fuente Press Start 2P en todos los textos.
-- Español e inglés; el primer arranque usa el idioma del sistema.
-- Música procedural: tema de menú, tema de combate con tempo propio por sector (más rápido contra el jefe) y jingles de victoria y derrota.
-- Todos los efectos de sonido de la versión web.
-- Trofeos guardados entre partidas.
+### Presentation
+- Press Start 2P font on all text.
+- Spanish and English; on first launch the game follows the system language.
+- Procedural music: menu theme, combat theme with its own tempo per sector (faster during boss fights), and victory and defeat jingles.
+- Every sound effect from the web version.
+- Trophies persist between sessions.
 
-## Controles
+## Controls
 
-| Acción | En juego | En menús |
+| Action | In game | In menus |
 |---|---|---|
-| Moverse / navegar | Stick izquierdo o cruceta | Stick izquierdo o cruceta |
-| Apuntar | Stick derecho | — |
-| Disparar / aceptar | R o Cruz | Cruz |
-| Hyper Bomb / volver | Cuadrado o Círculo | Círculo |
-| Pausa | Start | Start (en el menú: jugar) |
-| Cambiar pestaña | — | L / R (Guía) |
+| Move / navigate | Left stick or D-pad | Left stick or D-pad |
+| Aim | Right stick | — |
+| Fire / confirm | R or Cross | Cross |
+| Hyper Bomb / back | Square or Circle | Circle |
+| Pause | Start | Start (main menu: play) |
+| Switch tab | — | L / R (Guide) |
 
-## Correcciones
-- Error `0x8010113D` al abrir la app: `icon0.png` vuelve a ser PNG indexado de 8 bits.
+## Fixes
+- Error `0x8010113D` when launching the app: `icon0.png` is an 8-bit indexed PNG again.
 
-## Notas
-- No incluye los controles táctiles de la versión móvil web.
-- Guardado en `ux0:data/shooterspace/save.dat` (formato v2, migra automáticamente el de la v1.0).
+## Notes
+- The touch controls from the mobile web version are not included.
+- Save file: `ux0:data/shooterspace/save.dat` (format v2, the v1.0 save is migrated automatically).
