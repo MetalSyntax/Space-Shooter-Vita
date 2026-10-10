@@ -1,113 +1,90 @@
-#include <iostream>
-#include <vector>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
 #include <SDL2/SDL.h>
 #include "Renderer.hpp"
 #include "InputManager.hpp"
-#include "generators/PixelArtGenerator.hpp"
-#include "generators/OriginalSprites.hpp"
-#include "generators/BossGenerator.hpp"
-#include "entities/Player.hpp"
-#include "entities/Bullet.hpp"
-#include "entities/Enemy.hpp"
-#include "entities/CollisionSystem.hpp"
-#include "LevelManager.hpp"
-#include "WaveManager.hpp"
-#include "ParticlePool.hpp"
-#include "audio/Synth.hpp"
-#include "HUD.hpp"
+#include "Assets.hpp"
+#include "GameScene.hpp"
+#include "Menus.hpp"
+#include "Text.hpp"
+#include "I18n.hpp"
 #include "SaveSystem.hpp"
 #include "TrophyManager.hpp"
+#include "audio/Synth.hpp"
 
 #ifdef __vita__
 #include <psp2/kernel/processmgr.h>
+#include <psp2/apputil.h>
+#include <psp2/system_param.h>
 #endif
 
+enum class Scene { MENU, HANGAR, GUIDE, GAME, PAUSE, LEVEL_CLEAR, RESULTS };
+
+/** First run: follow the system language (Phaser used navigator.language). */
+static I18n::Lang systemLanguage() {
+#ifdef __vita__
+    SceAppUtilInitParam init;
+    SceAppUtilBootParam boot;
+    std::memset(&init, 0, sizeof(init));
+    std::memset(&boot, 0, sizeof(boot));
+    sceAppUtilInit(&init, &boot);
+    int lang = 0;
+    if (sceAppUtilSystemParamGetInt(SCE_SYSTEM_PARAM_ID_LANG, &lang) == 0 && lang != SCE_SYSTEM_PARAM_LANG_SPANISH) return I18n::Lang::EN;
+    return I18n::Lang::ES;
+#else
+    const char* env = std::getenv("LANG");
+    return (env && std::strncmp(env, "es", 2) == 0) ? I18n::Lang::ES : I18n::Lang::EN;
+#endif
+}
+
 int main(int argc, char* argv[]) {
+    (void)argc;
+    (void)argv;
+    std::srand(static_cast<unsigned>(std::time(nullptr)));
+
     auto& renderer = Graphics::Renderer::instance();
     if (!renderer.init("Shooter Space - 960x544 [PS Vita / Desktop]")) {
         return 1;
     }
 
-    // Inicializar controles físicos de PS Vita y gamepad
     auto& inputMgr = Input::InputManager::instance();
     inputMgr.init();
 
-    // Inicializar sintetizador de audio
+    auto& save = Storage::SaveSystem::data();
+    I18n::g_lang = save.lang < 0 ? systemLanguage() : static_cast<I18n::Lang>(save.lang == 1);
+
     auto& synth = Audio::Synth::instance();
     synth.init();
+    synth.setMusicMuted(save.musicMuted);
+    synth.setSfxMuted(save.sfxMuted);
 
-    // Inicializar sistema de trofeos
     auto& trophyMgr = Game::TrophyManager::instance();
     trophyMgr.init();
 
-    // Cargar datos persistentes
-    auto saveData = Storage::SaveSystem::load();
+    UI::initFont(renderer);
+    Game::assets().load(renderer);
 
-    // 1. Gestor de Niveles y Campaña
-    Game::CampaignState campaign;
-    campaign.level = 1;
-    campaign.score = 0;
-    campaign.lives = 5;
+    Game::GameScene game;
+    Menus::MainMenu menu;
+    Menus::Hangar hangar;
+    Menus::Guide guide;
+    Menus::PauseMenu pause;
+    Menus::LevelClear levelClear;
+    Menus::Results results;
 
-    Game::WaveManager waveManager;
-    waveManager.init(campaign.level);
-    const auto& currentLevelDef = waveManager.getCurrentLevel();
+    Scene scene = Scene::MENU;
+    Scene guideReturn = Scene::MENU;
+    menu.enter();
 
-    // 2. Hornear fondo espacial procedural específico del sector
-    PixelArt::RawTexture rawBg = PixelArt::generateBackground(
-        42 + currentLevelDef.id,
-        currentLevelDef.spaceColor,
-        currentLevelDef.nebula1,
-        currentLevelDef.nebula2,
-        256
-    );
-    Graphics::TextureType* texBg = renderer.createTextureFromRaw(rawBg);
-
-    // 3. Hornear sprites de jugador
-    PixelArt::Grid shipGrid = PixelArt::generateShip(1337, 12, 12);
-    Graphics::TextureType* texShip = renderer.createTextureFromRaw(PixelArt::bakeTexture(shipGrid, PixelArt::PALETTES.at("player"), 3));
-
-    // 4. Proyectiles y Powerups
-    PixelArt::Grid laserGrid = PixelArt::makeGrid(2, 6, PixelArt::CORE);
-    laserGrid[0][0] = laserGrid[0][1] = PixelArt::LIGHT;
-    Graphics::TextureType* texLaser = renderer.createTextureFromRaw(PixelArt::bakeTexture(laserGrid, PixelArt::PALETTES.at("player"), 3));
-
-    PixelArt::Grid missileGrid = PixelArt::generateMissile();
-    Graphics::TextureType* texMissile = renderer.createTextureFromRaw(PixelArt::bakeTexture(missileGrid, PixelArt::PALETTES.at("player"), 3));
-
-    PixelArt::Grid orbGrid = PixelArt::generateOrb(8);
-    Graphics::TextureType* texEnemyOrb = renderer.createTextureFromRaw(PixelArt::bakeTexture(orbGrid, PixelArt::PALETTES.at("toxic"), 3));
-
-    PixelArt::Grid shieldGrid = PixelArt::generateOrb(16, true);
-    Graphics::TextureType* texShield = renderer.createTextureFromRaw(PixelArt::bakeTexture(shieldGrid, PixelArt::PALETTES.at("rift"), 2));
-
-    PixelArt::Grid droneGrid = PixelArt::generateShip(99, 6, 6);
-    Graphics::TextureType* texDrone = renderer.createTextureFromRaw(PixelArt::bakeTexture(droneGrid, PixelArt::PALETTES.at("gold"), 2));
-
-    // 5. Hornear Sprites de Enemigos
-    PixelArt::Palette pWeaver, pGunship;
-    PixelArt::Grid weaverGrid = OriginalSprites::decodeSprite(OriginalSprites::enemyWeaver, pWeaver);
-    Graphics::TextureType* texEnemyWeaver = renderer.createTextureFromRaw(PixelArt::bakeTexture(weaverGrid, pWeaver, 2));
-
-    PixelArt::Grid enemyShipGrid = OriginalSprites::decodeSprite(OriginalSprites::enemyShip, pGunship);
-    Graphics::TextureType* texEnemyGunship = renderer.createTextureFromRaw(PixelArt::bakeTexture(enemyShipGrid, pGunship, 2));
-
-    // 6. Hornear Boss del Sector
-    PixelArt::Grid bossGrid = BossGenerator::generateBossHull(currentLevelDef.boss);
-    Graphics::TextureType* texBoss = renderer.createTextureFromRaw(PixelArt::bakeTexture(bossGrid, PixelArt::PALETTES.at("volcanic"), 2));
-
-    // 7. Instanciar Jugador y Pools
-    Game::Player player;
-    player.init(Game::ShipId::VANGUARD);
-    player.activatePower(Game::PowerKind::SPREAD, 9999999.0f);
-
-    Game::BulletPool<512> bulletPool;
-    Game::EnemyPool<128> enemyPool;
-    Graphics::ParticlePool<1024> particlePool;
+    auto startGame = [&](const Game::CampaignState& c) {
+        synth.stopMusic();
+        game.start(c);
+        scene = Scene::GAME;
+    };
 
     bool running = true;
     SDL_Event event;
-    float bgScrollY = 0.0f;
     uint32_t lastTicks = SDL_GetTicks();
 
     while (running) {
@@ -117,115 +94,109 @@ int main(int argc, char* argv[]) {
         lastTicks = currentTicks;
 
         while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
-                running = false;
+            if (event.type == SDL_QUIT) running = false;
+        }
+
+        Input::InputState input = inputMgr.poll(dt);
+
+        switch (scene) {
+            case Scene::MENU: {
+                auto action = menu.update(dt, input);
+                if (action == Menus::MainMenu::Action::CONTINUE) {
+                    startGame(menu.saved);
+                } else if (action == Menus::MainMenu::Action::NEW_GAME) {
+                    Game::clearCampaign();
+                    auto ship = static_cast<Game::ShipId>(std::clamp(save.selectedShip, 0, Game::SHIP_COUNT - 1));
+                    startGame(Game::newCampaign(menu.difficulty, ship));
+                } else if (action == Menus::MainMenu::Action::HANGAR) {
+                    hangar.enter();
+                    scene = Scene::HANGAR;
+                } else if (action == Menus::MainMenu::Action::GUIDE) {
+                    guide.enter();
+                    guideReturn = Scene::MENU;
+                    scene = Scene::GUIDE;
+                }
+                break;
+            }
+            case Scene::HANGAR:
+                if (hangar.update(dt, input)) {
+                    menu.refresh();
+                    scene = Scene::MENU;
+                }
+                break;
+            case Scene::GUIDE:
+                if (guide.update(dt, input)) {
+                    if (guideReturn == Scene::MENU) menu.refresh();
+                    scene = guideReturn;
+                }
+                break;
+            case Scene::GAME: {
+                Game::Outcome outcome = game.update(dt, input);
+                if (outcome == Game::Outcome::PAUSE) {
+                    pause.enter();
+                    scene = Scene::PAUSE;
+                } else if (outcome == Game::Outcome::LEVEL_CLEAR) {
+                    levelClear.enter(game.resultCampaign, game.stats);
+                    scene = Scene::LEVEL_CLEAR;
+                } else if (outcome == Game::Outcome::GAME_OVER) {
+                    results.enter(false, game.finalScore, game.difficulty(), game.newRecord, &game.campaignAtStart());
+                    scene = Scene::RESULTS;
+                } else if (outcome == Game::Outcome::VICTORY) {
+                    results.enter(true, game.finalScore, game.difficulty(), game.newRecord, nullptr);
+                    scene = Scene::RESULTS;
+                }
+                break;
+            }
+            case Scene::PAUSE: {
+                auto action = pause.update(dt, input);
+                if (action == Menus::PauseMenu::Action::RESUME) {
+                    scene = Scene::GAME;
+                } else if (action == Menus::PauseMenu::Action::RESTART) {
+                    Game::CampaignState c = game.campaignAtStart();
+                    startGame(c);
+                } else if (action == Menus::PauseMenu::Action::GUIDE) {
+                    guide.enter();
+                    guideReturn = Scene::PAUSE;
+                    scene = Scene::GUIDE;
+                } else if (action == Menus::PauseMenu::Action::MENU) {
+                    menu.enter();
+                    scene = Scene::MENU;
+                }
+                break;
+            }
+            case Scene::LEVEL_CLEAR:
+                if (levelClear.update(dt, input)) startGame(levelClear.next);
+                break;
+            case Scene::RESULTS: {
+                auto action = results.update(dt, input);
+                if (action == Menus::Results::Action::RETRY) {
+                    startGame(results.retryCampaign());
+                } else if (action == Menus::Results::Action::MENU) {
+                    menu.enter();
+                    scene = Scene::MENU;
+                }
+                break;
             }
         }
 
-        // Leer controles físicos de PS Vita (SceCtrl) o Teclado/Gamepad
-        Input::InputState input = inputMgr.poll();
-        if (input.pause) {
-            running = false;
+        switch (scene) {
+            case Scene::MENU: menu.render(renderer); break;
+            case Scene::HANGAR: hangar.render(renderer); break;
+            case Scene::GUIDE: guide.render(renderer); break;
+            case Scene::GAME: game.render(renderer); break;
+            case Scene::PAUSE: game.render(renderer); pause.render(renderer); break;
+            case Scene::LEVEL_CLEAR: levelClear.render(renderer); break;
+            case Scene::RESULTS: results.render(renderer); break;
         }
 
-        if (input.bomb) {
-            player.useBomb();
-            synth.playBomb();
-            particlePool.explode(Graphics::SCREEN_WIDTH / 2.0f, Graphics::SCREEN_HEIGHT / 2.0f, 4.0f);
-            trophyMgr.unlock(Game::TrophyId::HYPER_BOMB);
-        }
-
-        // 1. Gestor de Oleadas y Boss
-        waveManager.update(dt, player.getX(), player.getY(), enemyPool, bulletPool);
-
-        // 2. Estela de propulsor del jugador
-        particlePool.spawnThruster(player.getX(), player.getY() + 18.0f, player.getAimAngle(), 250.0f);
-
-        // 3. Actualizar Jugador, Balas, Enemigos, Partículas y Trofeos
-        player.update(dt, input, bulletPool);
-        bulletPool.update(dt);
-        enemyPool.update(dt, player.getX(), player.getY(), bulletPool);
-        particlePool.update(dt);
         trophyMgr.update(dt);
-
-        // 4. Detección de colisiones
-        int prevScore = campaign.score;
-        campaign.score += Game::CollisionSystem::checkBulletVsEnemies(bulletPool, enemyPool, waveManager, particlePool);
-        if (campaign.score > prevScore) {
-            synth.playExplosion(false);
-            trophyMgr.unlock(Game::TrophyId::FIRST_BLOOD);
-            if (campaign.score >= 10000) {
-                trophyMgr.unlock(Game::TrophyId::SCORE_10K);
-            }
-        }
-
-        if (waveManager.isLevelClear()) {
-            trophyMgr.unlock(Game::TrophyId::BOSS_SLAYER);
-        }
-
-        Game::CollisionSystem::checkEnemiesVsPlayer(bulletPool, enemyPool, player, particlePool);
-
-        // Guardar record si se supera
-        if (campaign.score > saveData.highScore) {
-            saveData.highScore = campaign.score;
-            Storage::SaveSystem::save(saveData);
-        }
-
-        bgScrollY += 60.0f * dt;
-
-        // 5. Renderizado
-        renderer.clear();
-
-        // Fondo del sector
-        renderer.drawBackgroundTiled(texBg, 0, static_cast<int>(bgScrollY));
-
-        // Partículas (estelas y chispas)
-        particlePool.render(renderer);
-
-        // Esbirros
-        enemyPool.render(renderer, texEnemyWeaver, texEnemyGunship);
-
-        // Boss del Sector si está activo
-        float bossHpPct = -1.0f;
-        if (waveManager.isBossPhase() && !waveManager.isLevelClear()) {
-            renderer.drawTexture(texBoss, static_cast<int>(waveManager.getBossX()), static_cast<int>(waveManager.getBossY()), 0.0, 1.2f, true);
-
-            bossHpPct = std::max(0.0f, static_cast<float>(waveManager.getBossHp()) / waveManager.getBossMaxHp());
-
-            // Barra de vida del Boss
-            renderer.drawRect(Graphics::SCREEN_WIDTH / 2 - 150, 20, 300, 12, 50, 50, 60, 200);
-            renderer.drawRect(Graphics::SCREEN_WIDTH / 2 - 148, 22, static_cast<int>(296 * bossHpPct), 8, 255, 60, 60, 255);
-        }
-
-        // Balas
-        bulletPool.render(renderer, texLaser, texMissile, texEnemyOrb);
-
-        // Jugador
-        player.render(renderer, texShip, texShield, texDrone);
-
-        // HUD e interfaz pixel-art
-        UI::HUD::render(renderer, campaign.score, player.getLives(), player.getBombs(), campaign.level, bossHpPct);
-
-        // Notificación de Trofeo emergente estilo PS Vita
         trophyMgr.renderNotification(renderer);
-
         renderer.present();
     }
 
-    // Limpieza
     synth.shutdown();
-
-    renderer.freeTexture(texBg);
-    renderer.freeTexture(texShip);
-    renderer.freeTexture(texLaser);
-    renderer.freeTexture(texMissile);
-    renderer.freeTexture(texEnemyOrb);
-    renderer.freeTexture(texShield);
-    renderer.freeTexture(texDrone);
-    renderer.freeTexture(texEnemyWeaver);
-    renderer.freeTexture(texEnemyGunship);
-    renderer.freeTexture(texBoss);
-
+    Game::assets().unload(renderer);
+    UI::freeFont(renderer);
     renderer.shutdown();
 
 #ifdef __vita__

@@ -7,3 +7,4 @@ lib/vitashark/source/*.o
 build/
 build_vita/
 
+save_data/

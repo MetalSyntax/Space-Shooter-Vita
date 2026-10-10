@@ -22,7 +22,7 @@ if(DEFINED VITA OR DEFINED ENV{VITASDK})
 
     set(VITA_APP_NAME "Shooter Space")
     set(VITA_TITLEID  "SHTR00001")
-    set(VITA_VERSION  "01.00")
+    set(VITA_VERSION  "01.10")
 
     add_executable(${PROJECT_NAME} ${SOURCES})
 
@@ -100,4 +100,7 @@ else()
     target_link_libraries(${PROJECT_NAME}
         ${SDL2_LIBRARIES}
     )
+
+    # Rules self-check: build/selfcheck
+    add_executable(selfcheck tests/selfcheck.cpp src/LevelManager.cpp src/entities/Ships.cpp)
 endif()
